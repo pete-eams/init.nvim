@@ -18,10 +18,12 @@ Plug 'luochen1990/rainbow'                              " rainbow parenthesis
 Plug 'hzchirs/vim-material'                             " material color themes
 Plug 'gregsexton/MatchTag'                              " highlight matching html tags
 Plug 'Jorengarenar/vim-MvVis'                           " move visual selection
+Plug 'joshdick/onedark.vim'                             " onedark theme
 "}}}
 
 " ================= Functionalities ================= "{{{
 
+Plug 'preservim/nerdtree'                               " NERDTree
 Plug 'neoclide/coc.nvim', {'branch': 'release'}         " LSP and more
 Plug 'junegunn/fzf', { 'do': { -> fzf#install() } }     " fzf itself
 Plug 'junegunn/fzf.vim'                                 " fuzzy search integration
@@ -38,6 +40,9 @@ Plug 'machakann/vim-sandwich'                           " make sandwiches
 Plug 'christoomey/vim-tmux-navigator'                   " seamless vim and tmux navigation
 Plug 'iamcco/markdown-preview.nvim', { 'do': 'cd app && yarn install'  }
 Plug 'memgraph/cypher.vim'
+Plug 'dense-analysis/ale'
+Plug 'OmniSharp/omnisharp-vim'
+Plug 'rust-lang/rust.vim'
 call plug#end()
 
 "}}}
@@ -70,7 +75,7 @@ set undofile                                            " enable persistent undo
 set undodir=/tmp                                        " undo temp file directory
 set foldlevel=0                                         " open all folds by default
 set inccommand=nosplit                                  " visual feedback while substituting
-set showtabline=0                                       " always show tabline
+set showtabline=2                                       " always show tabline
 set grepprg=rg\ --vimgrep                               " use rg as default grepper
 
 " performance tweaks
@@ -93,7 +98,7 @@ set signcolumn=yes
 
 " Themeing
 let g:material_style = 'oceanic'
-colorscheme vim-material
+colorscheme onedark
 hi Pmenu guibg='#00010a' guifg=white                    " popup menu colors
 hi Comment gui=italic cterm=italic                      " italic comments
 hi Search guibg=#b16286 guifg=#ebdbb2 gui=NONE          " search string highlight color
@@ -153,6 +158,12 @@ let g:coc_global_extensions = [
             \'coc-highlight',
             \'coc-sh',
             \]
+
+" ale Configurations
+let g:ale_linters = {
+\ 'cs': ['OmniSharp']
+\}
+let g:OmniSharp_server_use_net6 = 1
 
 " indentLine
 let g:indentLine_char_list = ['▏', '¦', '┆', '┊']
@@ -268,12 +279,57 @@ autocmd BufReadPost *
      \   exe "normal! g`\"" |
      \ endif
 
+" Rust
+let g:rustfmt_autosave = 1
+
 " python renaming and folding
 augroup python
     autocmd FileType python nnoremap <leader>rn :Semshi rename <CR>
     autocmd FileType python set foldmethod=syntax
     autocmd FileType python syn sync fromstart
     autocmd FileType python syn region foldImports start='"""' end='"""' fold keepend
+augroup end
+
+augroup omnisharp_commands
+  autocmd!
+
+  " Show type information automatically when the cursor stops moving.
+  " Note that the type is echoed to the Vim command line, and will overwrite
+  " any other messages in this space including e.g. ALE linting messages.
+  autocmd CursorHold *.cs OmniSharpTypeLookup
+
+  " The following commands are contextual, based on the cursor position.
+  autocmd FileType cs nmap <silent> <buffer> gd <Plug>(omnisharp_go_to_definition)
+  autocmd FileType cs nmap <silent> <buffer> <Leader>osfu <Plug>(omnisharp_find_usages)
+  autocmd FileType cs nmap <silent> <buffer> <Leader>osfi <Plug>(omnisharp_find_implementations)
+  autocmd FileType cs nmap <silent> <buffer> <Leader>ospd <Plug>(omnisharp_preview_definition)
+  autocmd FileType cs nmap <silent> <buffer> <Leader>ospi <Plug>(omnisharp_preview_implementations)
+  autocmd FileType cs nmap <silent> <buffer> <Leader>ost <Plug>(omnisharp_type_lookup)
+  autocmd FileType cs nmap <silent> <buffer> <Leader>osd <Plug>(omnisharp_documentation)
+  autocmd FileType cs nmap <silent> <buffer> <Leader>osfs <Plug>(omnisharp_find_symbol)
+  autocmd FileType cs nmap <silent> <buffer> <Leader>osfx <Plug>(omnisharp_fix_usings)
+  autocmd FileType cs nmap <silent> <buffer> <C-\> <Plug>(omnisharp_signature_help)
+  autocmd FileType cs imap <silent> <buffer> <C-\> <Plug>(omnisharp_signature_help)
+
+  " Navigate up and down by method/property/field
+  autocmd FileType cs nmap <silent> <buffer> [[ <Plug>(omnisharp_navigate_up)
+  autocmd FileType cs nmap <silent> <buffer> ]] <Plug>(omnisharp_navigate_down)
+  " Find all code errors/warnings for the current solution and populate the quickfix window
+  autocmd FileType cs nmap <silent> <buffer> <Leader>osgcc <Plug>(omnisharp_global_code_check)
+  " Contextual code actions (uses fzf, vim-clap, CtrlP or unite.vim selector when available)
+  autocmd FileType cs nmap <silent> <buffer> <Leader>osca <Plug>(omnisharp_code_actions)
+  autocmd FileType cs xmap <silent> <buffer> <Leader>osca <Plug>(omnisharp_code_actions)
+  " Repeat the last code action performed (does not use a selector)
+  autocmd FileType cs nmap <silent> <buffer> <Leader>os. <Plug>(omnisharp_code_action_repeat)
+  autocmd FileType cs xmap <silent> <buffer> <Leader>os. <Plug>(omnisharp_code_action_repeat)
+
+  autocmd FileType cs nmap <silent> <buffer> <Leader>os= <Plug>(omnisharp_code_format)
+
+  autocmd FileType cs nmap <silent> <buffer> <Leader>rn <Plug>(omnisharp_rename)
+
+  autocmd FileType cs nmap <silent> <buffer> <Leader>osre <Plug>(omnisharp_restart_server)
+  autocmd FileType cs nmap <silent> <buffer> <Leader>osst <Plug>(omnisharp_start_server)
+  autocmd FileType cs nmap <silent> <buffer> <Leader>ossp <Plug>(omnisharp_stop_server)
 augroup end
 
 " format with available file format formatter
@@ -308,7 +364,8 @@ function! StartifyEntryFormat()
 endfunction
 
 " check if last inserted char is a backspace (used by coc pmenu)
-function! s:check_back_space() abort
+
+function! CheckBackSpace() abort
   let col = col('.') - 1
   return !col || getline('.')[col - 1]  =~# '\s'
 endfunction
@@ -365,6 +422,23 @@ noremap <C-j> <C-w>j
 nnoremap <C-k> <C-w>k
 nnoremap <C-l> <C-w>l
 
+" tab management
+map <leader>tn :tabnew<CR>
+map <leader>to :tabonly<CR>
+map <leader>tc :tabclose<CR>
+map <leader>tm :tabmove<CR>
+map <leader>tl :tabn<CR>
+map <leader>th :tabp<CR>
+
+"
+nnoremap <leader>n :NERDTreeFocus<CR>
+nnoremap <C-n> :NERDTree<CR>
+nnoremap <C-t> :NERDTreeToggle<CR>
+nnoremap <C-f> :NERDTreeFind<CR>
+
+" Exit Vim if NERDTree is the only window remaining in the only tab.
+autocmd BufEnter * if tabpagenr('$') == 1 && winnr('$') == 1 && exists('b:NERDTree') && b:NERDTree.isTabTree() | quit | endif
+
 " disable hl with 2 esc
 noremap <silent><esc> <esc>:noh<CR><esc>
 
@@ -396,7 +470,7 @@ inoremap <silent><expr> <TAB>
     \ coc#pum#visible() ? coc#_select_confirm() :
     \ coc#expandableOrJumpable() ?
     \ "\<C-r>=coc#rpc#request('doKeymap', ['snippets-expand-jump',''])\<CR>" :
-    \ check_back_space() ? "\<TAB>" :
+    \ CheckBackSpace() ? "\<TAB>" :
     \ coc#refresh()
 
 let g:coc_snippet_next = '<tab>'
